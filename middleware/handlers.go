@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Reticent93/awesomePostgresGo/models"
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 //response format
@@ -44,8 +46,8 @@ func create() *gorm.DB {
 	return db
 }
 
-//CreateUser create a car in the postgres db
-func CreateUser(w http.ResponseWriter, r *http.Request) {
+//CreateCar create a car in the postgres db
+func CreateCar(w http.ResponseWriter, r *http.Request) {
 	//setting the header to content type x-www-form-urlencoded
 	// Allow all origin to handle cors issue
 	w.Header().Set("Content-type", "application/x-www-form-urlencoded")
@@ -54,15 +56,163 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Header", "Content-Type")
 
 	//create an empty car of type models.Cars
-	var cars models.Cars
+	var car models.Cars
 
 	//decode the json request to car
-	err := json.NewDecoder(r.Body).Decode(cars)
+	err := json.NewDecoder(r.Body).Decode(&car)
 	if err != nil {
 		log.Fatal("Unable to decode the request body", err)
 	}
 
 	//call insert car function and pass in a car
-	insertID := insertCars(cars)
+	insertID := insertCar(car)
 
+	//format a response object
+	res := response{
+		ID:      insertID,
+		Message: "Car created successfully",
+	}
+
+	//send the response
+	json.NewEncoder(w).Encode(res)
+}
+
+//GetCar returns a single car
+func GetCar(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	//get the carid from the request params, key is "id"
+	params := mux.Vars(r)
+
+	//convert the id type from string to int
+	id, err := strconv.Atoi(params["id"])
+
+	if err != nil {
+		log.Fatalf("Unable to convert the string into int. %v", err)
+	}
+
+	//call the getCar function with car id to retrieve a single car
+	car, err := getCar(int64(id))
+	if err != nil {
+		log.Fatalf("Unable to get user. %v", err)
+	}
+
+	//send the response
+	json.NewEncoder(w).Encode(car)
+}
+
+//GetAllCars will return all the cars
+func GetAllCars(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	//get all the cars in the db
+	cars, err := getAllCars()
+	if err != nil {
+		log.Fatalf("Unable to get all cars. %v", err)
+	}
+
+	//send all the cars as a response
+	json.NewEncoder(w).Encode(cars)
+}
+
+//UpdateCar updates the cars' details in the db
+func UpdateCar(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	params := mux.Vars(r)
+
+	//convert the id type from string to int
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		log.Fatal("Unable to convert the string into int", err)
+	}
+
+	//create an empty car of type models.Car
+	var car models.Cars
+
+	//decode the json request to car
+	err = json.NewDecoder(r.Body).Decode(&car)
+	if err != nil {
+		log.Fatalf("Unable to decode the request body. %v", err)
+	}
+
+	//call update car to update the car
+	updatedRows := updateCar(int64(id), car)
+
+	//format the message string
+	msg := fmt.Sprintf("Car updated successfully. Total rows/record affected %v", updatedRows)
+
+	//format the response message
+	res := response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	//send the response
+	json.NewEncoder(w).Encode(res)
+}
+
+//DeleteCar deletes cars' detail in the db
+func DeleteCar(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/x-www-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	//get the carid from the request params, key is "id
+	params := mux.Vars(r)
+
+	//convert the id in string to int
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		log.Fatalf("Unable to convert the string into int. %v", err)
+	}
+
+	//call the deleteCar, convert the int to int64
+	deletedRows := deleteCar(int64(id))
+
+	//format the message string
+	msg := fmt.Sprintf("Car updated successfully. Total rows/record affected %v", deletedRows)
+
+	//format the response message
+	res := response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	//send the response
+	json.NewEncoder(w).Encode(res)
+
+}
+
+//<-------------------------handler functions----------------------------->
+
+//insert one car in the DB
+func insertCar(car models.Cars) int64 {
+
+	//create a postgres connection
+	db := create()
+
+	//create the insert sql query
+	//returning carid will return the id of the inserted car
+	sqlStatement := `INSERT INTO cars (carMake, carModel, mileage, clean) VALUES($1, $2, $3, $4) RETURNING carid`
+
+	//the inserted id will be stored in this id
+	var id int64
+
+	//execute the sql statement
+	//Scan function will save the insert id in the id
+	err := db.First(sqlStatement, car.CarMake, car.CarModel, car.Mileage, car.Clean).Scan(id)
+	if err != nil {
+		log.Fatalf("Unable to execute the query. %v", err)
+	}
+	fmt.Printf("Inserted a single record %v", id)
+
+	//return the inserted id
+	return id
 }
