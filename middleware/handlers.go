@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/Reticent93/awesomePostgresGo/models"
@@ -215,4 +216,67 @@ func insertCar(car models.Cars) int64 {
 
 	//return the inserted id
 	return id
+}
+
+//get one car from the db by its carid
+func getCar(id int64) (models.Cars, error) {
+	//create a db connection
+	db := create()
+
+	//create a car of models.Cars type
+	var car models.Cars
+
+	//create the select sql query
+	sqlStatement := `SELECT * FROM cars WHERE carid=$1`
+
+	//execute the sql statement
+	row := db.Find(sqlStatement, id)
+
+	//unmarshal the row object to car.Make sure to add .Error at end
+	err := row.Scan(&car).Error
+
+	switch err {
+	case gorm.ErrRecordNotFound:
+		fmt.Println("No rows were returned")
+		return car, nil
+	case nil:
+		return car, nil
+	default:
+		log.Fatalf("Unable to scan the row. %v", err)
+	}
+
+	//return empty user on error
+	return car, err
+}
+
+//get all cars from the db
+func getAllCars() ([]models.Cars, error) {
+
+	//create db connection
+	db := create()
+
+	var cars []models.Cars
+
+	//create a select sql query
+	sqlStatement := `SELECT * FROM cars`
+
+	//execute the sql statement
+	rows := db.Find(sqlStatement)
+
+	//iterate over the rows
+	for rows.Next() {
+		var car models.Cars
+
+		//unmarshal the row object to car
+		err := rows.Scan(&car).Error
+		if err != nil {
+			log.Fatalf("Unable to scan the row. %v", err)
+		}
+
+		//append the car in the cars slice
+		cars = append(cars, car)
+	}
+	//return empty car on error
+	return cars, err
+
 }
