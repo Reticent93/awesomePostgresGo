@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"database/sql"
+	_ "database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/Reticent93/awesomePostgresGo/models"
@@ -15,13 +15,13 @@ import (
 	"strconv"
 )
 
-//response format
+// response format
 type response struct {
 	ID      int64  `json:"id,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 
-//create function with postgres
+// create function with postgres
 func create() *gorm.DB {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -47,7 +47,7 @@ func create() *gorm.DB {
 	return db
 }
 
-//CreateCar create a car in the postgres db
+// CreateCar create a car in the postgres db
 func CreateCar(w http.ResponseWriter, r *http.Request) {
 	//setting the header to content type x-www-form-urlencoded
 	// Allow all origin to handle cors issue
@@ -78,7 +78,7 @@ func CreateCar(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-//GetCar returns a single car
+// GetCar returns a single car
 func GetCar(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Context-Type", "application/x-www-urlencoded")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -103,7 +103,7 @@ func GetCar(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(car)
 }
 
-//GetAllCars will return all the cars
+// GetAllCars will return all the cars
 func GetAllCars(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Context-Type", "application/x-www-urlencoded")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -118,7 +118,7 @@ func GetAllCars(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(cars)
 }
 
-//UpdateCar updates the cars' details in the db
+// UpdateCar updates the cars' details in the db
 func UpdateCar(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Context-Type", "application/x-www-urlencoded")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -143,7 +143,8 @@ func UpdateCar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//call update car to update the car
-	updatedRows := updateCar(int64(id), car)
+	//updatedRows := updateCar(int64(id), car)
+	updatedRows := json.NewDecoder(r.Body).Decode(&car)
 
 	//format the message string
 	msg := fmt.Sprintf("Car updated successfully. Total rows/record affected %v", updatedRows)
@@ -156,9 +157,10 @@ func UpdateCar(w http.ResponseWriter, r *http.Request) {
 
 	//send the response
 	json.NewEncoder(w).Encode(res)
+
 }
 
-//DeleteCar deletes cars' detail in the db
+// DeleteCar deletes cars' detail in the db
 func DeleteCar(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/x-www-urlencoded")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -175,7 +177,8 @@ func DeleteCar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//call the deleteCar, convert the int to int64
-	deletedRows := deleteCar(int64(id))
+	//deletedRows := DeleteCar(id, r)
+	deletedRows := json.NewDecoder(r.Body).Decode(&id)
 
 	//format the message string
 	msg := fmt.Sprintf("Car updated successfully. Total rows/record affected %v", deletedRows)
@@ -193,7 +196,7 @@ func DeleteCar(w http.ResponseWriter, r *http.Request) {
 
 //<-------------------------handler functions----------------------------->
 
-//insert one car in the DB
+// insert one car in the DB
 func insertCar(car models.Cars) int64 {
 
 	//create a postgres connection
@@ -218,7 +221,7 @@ func insertCar(car models.Cars) int64 {
 	return id
 }
 
-//get one car from the db by its carid
+// get one car from the db by its carid
 func getCar(id int64) (models.Cars, error) {
 	//create a db connection
 	db := create()
@@ -249,7 +252,7 @@ func getCar(id int64) (models.Cars, error) {
 	return car, err
 }
 
-//get all cars from the db
+// get all cars from the db
 func getAllCars() ([]models.Cars, error) {
 
 	//create db connection
@@ -277,6 +280,6 @@ func getAllCars() ([]models.Cars, error) {
 		cars = append(cars, car)
 	}
 	//return empty car on error
-	return cars, err
 
+	return cars, nil
 }
